@@ -1,14 +1,31 @@
-#include <fix_fft.h>
+/* Source: http://bildr.org/2011/01/hmc6352/ */
 
-const int Threshold = 7;
+#include <fix_fft.h>
+#include <Wire.h>
+
+const int Threshold = 5;
 
 char im[128];
 char data[128];
 char temp[4];
-int bN = 3; // 83
-int bE = 5; // 163 - throw these guys out
-int bS = 6; // 241
-int bW = 9; // 353
+//int bF = 3; // 83
+//int bR = 5; // 163 - throw these guys out
+//int bB = 6; // 241
+//int bL = 9; // 353
+
+int bF = 2; // 83
+int bR = 3; // 163 - throw these guys out
+int bB = 4; // 241
+int bL = 5;
+
+float northb = 0;
+float eastb = 90;
+float southb = 180;
+float westb = 270;
+
+int HMC6352SlaveAddress = 0x42;
+int HMC6352ReadAddress = 0x41; //"A" in hex, A command is: 
+
 
 /*
 83
@@ -19,31 +36,77 @@ int bW = 9; // 353
 293
 353
 397
-
+449 stop
 */
+
+float getBearing() {
+  //"Get Data. Compensate and Calculate New Heading"
+  Wire.beginTransmission(HMC6352SlaveAddress);
+  Wire.write(HMC6352ReadAddress);              // The "Get Data" command
+  Wire.endTransmission();
+
+  //time delays required by HMC6352 upon receipt of the command
+  //Get Data. Compensate and Calculate New Heading : 6ms
+  delay(6);
+
+  Wire.requestFrom(HMC6352SlaveAddress, 2); //get the two data bytes, MSB and LSB
+
+  //"The heading output data will be the value in tenths of degrees
+  //from zero to 3599 and provided in binary format over the two bytes."
+  byte MSB = Wire.read();
+  byte LSB = Wire.read();
+
+  float headingSum = (MSB << 8) + LSB; //(MSB / LSB sum)
+  float headingInt = headingSum / 10;
+  return headingInt;
+}
+
+/* Buzz case for given direction: North */
+void caseForDir(float dirBearing) {
+  float diff = dirBearing - getBearing();
+  while (diff >= 180) diff -= 360;
+  while (diff < -180) diff += 360;
+  Serial.println(diff);
+  if (diff < 20 && diff > -20) {
+    digitalWrite(bF, HIGH);
+  } else if ((diff > 135) || (diff < -135)) {
+    digitalWrite(bB, HIGH);
+  } else if ((diff >= 20) && (diff <= 135)) {
+    digitalWrite(bR, HIGH);
+  } else if ((diff <= -20) && (diff >= -135)) {
+    digitalWrite(bL, HIGH);
+  } else {
+    Serial.println("HEY LOOK AT ME");
+    digitalWrite(bF, HIGH);
+  }
+}
 
 /* Buzz the buzzer associated with the given direction */
 void buzz(char dir) {
-  digitalWrite(bN, LOW);
-  digitalWrite(bE, LOW);
-  digitalWrite(bS, LOW);
-  digitalWrite(bW, LOW);
+  digitalWrite(bF, LOW);
+  digitalWrite(bR, LOW);
+  digitalWrite(bB, LOW);
+  digitalWrite(bL, LOW);
         
   switch (dir) {
     case 'N': {
-      digitalWrite(bN, HIGH);
+      caseForDir(northb);
+      // digitalWrite(bF, HIGH);
       break;
     }
     case 'E': {
-      digitalWrite(bE, HIGH);
+      caseForDir(eastb);
+      // digitalWrite(bR, HIGH);
       break;
     }
     case 'S': {
-      digitalWrite(bS, HIGH);
+      caseForDir(southb);      
+      // digitalWrite(bB, HIGH);
       break;
     }
     case 'W': {
-      digitalWrite(bW, HIGH);
+      caseForDir(westb);
+      // digitalWrite(bL, HIGH);
       break;
     }
     default: {
@@ -64,10 +127,12 @@ int detectTone(char input[]) {
 
 void setup() {
   Serial.begin(9600);
-  pinMode(bN, OUTPUT);
-  pinMode(bE, OUTPUT);
-  pinMode(bS, OUTPUT);
-  pinMode(bW, OUTPUT);
+  pinMode(bF, OUTPUT);
+  pinMode(bR, OUTPUT);
+  pinMode(bB, OUTPUT);
+  pinMode(bL, OUTPUT);
+    HMC6352SlaveAddress = HMC6352SlaveAddress >> 1; // I know 0x42 is less than 127, but this is still required
+  Wire.begin();
 }
 
 void loop(){
@@ -86,9 +151,9 @@ void loop(){
         
       }
       else{
-        //this could be done with the fix_fftr function without the im array.
+        //this could bR done with the fix_fftr function without the im array.
         fix_fft(data,im,7,0);
-        // I am only interessted in the absolute value of the transformation
+        // I am only interessted in the abBolute value of the transformation
         for (i=0; i< 64;i++){
            data[i] = sqrt(data[i] * data[i] + im[i] * im[i]); 
         }
@@ -124,6 +189,12 @@ void loop(){
           } else {
             Serial.write("?????");
           }
+        }
+        else {
+            digitalWrite(bF, LOW);
+            digitalWrite(bR, LOW);
+            digitalWrite(bB, LOW);
+            digitalWrite(bL, LOW);
         }
         
          // Serial.println(status);
