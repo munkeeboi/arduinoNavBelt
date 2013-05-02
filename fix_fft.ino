@@ -89,7 +89,7 @@ void buzzForDir(float bearing) {
 /**
  * Select buzzer for given absolute heading.
  */
-void buzz(DIRECTION dir) {
+void buzz(int dir) {
 	float myBearing = getBearing();
 	float desired = bearings[dir];
 	
@@ -151,8 +151,9 @@ void loop(){
             digitalWrite(bB, LOW);
             digitalWrite(bL, LOW);
         } else {
-			
-			for (int index = cutoffs.length-1; index >= 0; index--) {
+                        int lengthCutoffs = 8;
+			int index = lengthCutoffs-1;
+			for (index = lengthCutoffs-1; index >= 0; index--) {
 				if (cutoffs[index] < status) break;
 			}
 			index++;
@@ -163,7 +164,7 @@ void loop(){
 				digitalWrite(bB, HIGH);
 				digitalWrite(bL, HIGH);
 			} else {
-				buzz((DIRECTION) index);
+				buzz(dirs[index]);
 			}
 		}
       }
@@ -172,7 +173,7 @@ void loop(){
    }
 }
 
-midpoints
+//midpoints
 
 
 /*
