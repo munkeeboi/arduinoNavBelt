@@ -15,9 +15,13 @@ int bB = 4; // 241
 int bL = 5;
 
 float northb = 0;
+float northeastb = 45;
 float eastb = 90;
+float southeastb = 135;
 float southb = 180;
+float southwestb = 225;
 float westb = 270;
+float northwestb = 315;
 
 int HMC6352SlaveAddress = 0x42;
 int HMC6352ReadAddress = 0x41; //"A" in hex, A command is: 
@@ -62,7 +66,7 @@ void caseForDir(float dirBearing) {
   float diff = dirBearing - getBearing();
   while (diff >= 180) diff -= 360;
   while (diff < -180) diff += 360;
-  Serial.println(diff);
+  // Serial.println(diff);
   if (diff < 20 && diff > -20) {
     digitalWrite(bF, HIGH);
   } else if ((diff > 135) || (diff < -135)) {
@@ -162,19 +166,33 @@ void loop(){
         Serial.println(status);
         
         if (status > -1) {
-          if (status > 60) {
+          if (status > 58) {
               digitalWrite(bF, HIGH);
               digitalWrite(bR, HIGH);
               digitalWrite(bB, HIGH);
               digitalWrite(bL, HIGH);
+          } else if (status > 50) {
+            buzz('NW');
           }
-          if (status > 40) {
+          else if (status > 44) {
             buzz('W');
-          } else if (status > 25) {
-            buzz('S');
-          } else if (status > 15) {
+          } 
+          else if (status > 37) {
+            buzz('SW');
+          }
+          else if (status > 30) {
+            buzz('S');   
+          } 
+          else if (status > 23) {
+            buzz('SE');
+          }
+          else if (status > 19) {
             buzz('E');
-          } else if (status > 5) {
+          } 
+          else if (status > 14) {
+            buzz('NE');
+          }
+          else if (status > 5) {
             buzz('N');
           } else {
             Serial.write("?????");
@@ -191,3 +209,25 @@ void loop(){
     tt = millis();
    }
 }
+
+midpoints
+14
+19
+23
+30
+37
+44
+50
+58
+
+/*
+N 11
+NE 17
+E 21
+SE 26
+S 33
+SW 40
+W 48/7
+NW 52-53
+stop 63
+*/
