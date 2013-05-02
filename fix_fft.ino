@@ -9,19 +9,15 @@ char im[128];
 char data[128];
 char temp[4];
 
-int bF = 2; // 83
-int bR = 3; // 163 - throw these guys out
-int bB = 4; // 241
+int bF = 2;
+int bR = 3;
+int bB = 4;
 int bL = 5;
 
-float northb = 0;
-float northeastb = 45;
-float eastb = 90;
-float southeastb = 135;
-float southb = 180;
-float southwestb = 225;
-float westb = 270;
-float northwestb = 315;
+enum DIRECTION {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST, STOP};
+float bearings[] = {0, 45, 90, 135, 180, 225, 270, 315, -1};
+int cutoffs[] = {14, 19, 23, 30, 37, 44, 50, 58};
+DIRECTION dirs[] = {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST, STOP};
 
 int HMC6352SlaveAddress = 0x42;
 int HMC6352ReadAddress = 0x41; //"A" in hex, A command is: 
@@ -39,6 +35,9 @@ int HMC6352ReadAddress = 0x41; //"A" in hex, A command is:
 449 stop
 */
 
+/**
+ * Get bearing from the electronic compass.
+ */
 float getBearing() {
   //"Get Data. Compensate and Calculate New Heading"
   Wire.beginTransmission(HMC6352SlaveAddress);
@@ -61,62 +60,43 @@ float getBearing() {
   return headingInt;
 }
 
-/* Buzz case for given direction: North */
-void caseForDir(float dirBearing) {
-  float diff = dirBearing - getBearing();
-  while (diff >= 180) diff -= 360;
-  while (diff < -180) diff += 360;
-  // Serial.println(diff);
-  if (diff < 20 && diff > -20) {
-    digitalWrite(bF, HIGH);
-  } else if ((diff > 135) || (diff < -135)) {
-    digitalWrite(bB, HIGH);
-  } else if ((diff >= 20) && (diff <= 135)) {
-    digitalWrite(bR, HIGH);
-  } else if ((diff <= -20) && (diff >= -135)) {
-    digitalWrite(bL, HIGH);
-  } else {
-    Serial.println("HEY LOOK AT ME");
-    digitalWrite(bF, HIGH);
-  }
+/**
+ *  Buzz the buzzer for given relative direction.
+ */
+void buzzForDir(float bearing) {
+	digitalWrite(bF, LOW);
+	digitalWrite(bR, LOW);
+	digitalWrite(bB, LOW);
+	digitalWrite(bL, LOW);
+  
+	while (bearing >= 180) bearing -= 360;
+	while (bearing < -180) bearing += 360;
+	// Serial.println(bearing);
+	if (bearing < 20 && bearing > -20) {
+		digitalWrite(bF, HIGH);
+	} else if ((bearing > 135) || (bearing < -135)) {
+		digitalWrite(bB, HIGH);
+	} else if ((bearing >= 20) && (bearing <= 135)) {
+		digitalWrite(bR, HIGH);
+	} else if ((bearing <= -20) && (bearing >= -135)) {
+		digitalWrite(bL, HIGH);
+	} else {
+		Serial.println("HEY LOOK AT ME");
+		digitalWrite(bF, HIGH);
+	}
 }
 
-/* Buzz the buzzer associated with the given direction */
-void buzz(char dir) {
-  digitalWrite(bF, LOW);
-  digitalWrite(bR, LOW);
-  digitalWrite(bB, LOW);
-  digitalWrite(bL, LOW);
-        
-  switch (dir) {
-    case 'N': {
-      caseForDir(northb);
-      // digitalWrite(bF, HIGH);
-      break;
-    }
-    case 'E': {
-      caseForDir(eastb);
-      // digitalWrite(bR, HIGH);
-      break;
-    }
-    case 'S': {
-      caseForDir(southb);      
-      // digitalWrite(bB, HIGH);
-      break;
-    }
-    case 'W': {
-      caseForDir(westb);
-      // digitalWrite(bL, HIGH);
-      break;
-    }
-    default: {
-      Serial.write("Aiaiaiaiai");
-    }
-  }
+/**
+ * Select buzzer for given absolute heading.
+ */
+void buzz(DIRECTION dir) {
+	float myBearing = getBearing();
+	float desired = bearings[dir];
+	
+	buzzForDir(desired - myBearing);
 }
 
 int detectTone(char input[]) {
-	// TODO: pick out multiple frequencies instead of just one
 	int maxval = Threshold;
 	int maxindex = -1;
 	for (int i = 8; i < 64; i++) {
@@ -153,7 +133,7 @@ void loop(){
         i++;   
         
       }
-      else{
+      else {
         //this could bR done with the fix_fftr function without the im array.
         fix_fft(data,im,7,0);
         // I am only interessted in the abBolute value of the transformation
@@ -165,45 +145,27 @@ void loop(){
         
         Serial.println(status);
         
-        if (status > -1) {
-          if (status > 58) {
-              digitalWrite(bF, HIGH);
-              digitalWrite(bR, HIGH);
-              digitalWrite(bB, HIGH);
-              digitalWrite(bL, HIGH);
-          } else if (status > 50) {
-            buzz('NW');
-          }
-          else if (status > 44) {
-            buzz('W');
-          } 
-          else if (status > 37) {
-            buzz('SW');
-          }
-          else if (status > 30) {
-            buzz('S');   
-          } 
-          else if (status > 23) {
-            buzz('SE');
-          }
-          else if (status > 19) {
-            buzz('E');
-          } 
-          else if (status > 14) {
-            buzz('NE');
-          }
-          else if (status > 5) {
-            buzz('N');
-          } else {
-            Serial.write("?????");
-          }
-        }
-        else {
+        if (status < 0) {
             digitalWrite(bF, LOW);
             digitalWrite(bR, LOW);
             digitalWrite(bB, LOW);
             digitalWrite(bL, LOW);
-        }
+        } else {
+			
+			for (int index = cutoffs.length-1; index >= 0; index--) {
+				if (cutoffs[index] < status) break;
+			}
+			index++;
+			
+			if (index == STOP) {
+				digitalWrite(bF, HIGH);
+				digitalWrite(bR, HIGH);
+				digitalWrite(bB, HIGH);
+				digitalWrite(bL, HIGH);
+			} else {
+				buzz((DIRECTION) index);
+			}
+		}
       }
     
     tt = millis();
@@ -211,14 +173,7 @@ void loop(){
 }
 
 midpoints
-14
-19
-23
-30
-37
-44
-50
-58
+
 
 /*
 N 11
