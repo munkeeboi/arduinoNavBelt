@@ -178,6 +178,12 @@ void loop(){
         }
         */
         if (status > -1) {
+          if (status > 60) {
+              digitalWrite(bF, HIGH);
+              digitalWrite(bR, HIGH);
+              digitalWrite(bB, HIGH);
+              digitalWrite(bL, HIGH);
+          }
           if (status > 40) {
             buzz('W');
           } else if (status > 25) {
