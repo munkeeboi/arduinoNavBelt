@@ -8,10 +8,6 @@ const int Threshold = 5;
 char im[128];
 char data[128];
 char temp[4];
-//int bF = 3; // 83
-//int bR = 5; // 163 - throw these guys out
-//int bB = 6; // 241
-//int bL = 9; // 353
 
 int bF = 2; // 83
 int bR = 3; // 163 - throw these guys out
@@ -116,13 +112,16 @@ void buzz(char dir) {
 }
 
 int detectTone(char input[]) {
-  // TODO: pick out multiple frequencies instead of just one
-  for (int i = 8; i < 64; i++) {
-           if (input[i] > Threshold) {
-              return i;
-           }
-  }
-  return -1;
+	// TODO: pick out multiple frequencies instead of just one
+	int maxval = Threshold;
+	int maxindex = -1;
+	for (int i = 8; i < 64; i++) {
+		if (input[i] > maxval) {
+			maxindex = i;
+			maxval = input[i];
+		}
+	}
+	return maxindex;
 }
 
 void setup() {
@@ -162,21 +161,6 @@ void loop(){
         
         Serial.println(status);
         
-        /*
-        if (status > -1) {
-          if (status > 50) {
-            buzz('N');
-          } else if (status > 40) {
-            buzz('S');
-          } else if (status > 20) {
-            buzz('E');
-          } else if (status > 10) {
-            buzz('W');
-          } else {
-            Serial.write("?????");
-          }
-        }
-        */
         if (status > -1) {
           if (status > 60) {
               digitalWrite(bF, HIGH);
@@ -202,19 +186,6 @@ void loop(){
             digitalWrite(bB, LOW);
             digitalWrite(bL, LOW);
         }
-        
-         // Serial.println(status);
-/*
-        for (int i = 0; i < 64; i++) {
-           sprintf(temp, "%d", data[i]);
-           Serial.print(temp);
-           Serial.write(","); 
-        }
-        Serial.println();
-*/
-        
-        //do something with the data values 1..64 and ignore im
-        // show_big_bars(data,0);
       }
     
     tt = millis();
