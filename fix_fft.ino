@@ -2,6 +2,16 @@
 
 #include <fix_fft.h>
 #include <Wire.h>
+#include <stdarg.h>
+
+void p(char *fmt, ... ){
+        char tmp[128]; // resulting string limited to 128 chars
+        va_list args;
+        va_start (args, fmt );
+        vsnprintf(tmp, 128, fmt, args);
+        va_end (args);
+        Serial.print(tmp);
+}
 
 const int Threshold = 5;
 
@@ -9,15 +19,13 @@ char im[128];
 char data[128];
 char temp[4];
 
+  int prevbin;
+
 int bF = 2;
 int bR = 3;
 int bB = 4;
 int bL = 5;
-
-enum DIRECTION {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST, STOP};
-float bearings[] = {0, 45, 90, 135, 180, 225, 270, 315, -1};
-int cutoffs[] = {14, 19, 23, 30, 37, 44, 50, 58};
-DIRECTION dirs[] = {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST, STOP};
+int bErr = 6;
 
 int HMC6352SlaveAddress = 0x42;
 int HMC6352ReadAddress = 0x41; //"A" in hex, A command is: 
@@ -60,6 +68,23 @@ float getBearing() {
   return headingInt;
 }
 
+int pinForDir (float bearing) {
+  while (bearing < -180) bearing += 360;
+  while (bearing >= 180) bearing -= 360;
+  
+	if (bearing < 20 && bearing > -20) {
+		return bF;
+	} else if ((bearing > 135) || (bearing < -135)) {
+		return bB;
+	} else if ((bearing >= 20) && (bearing <= 135)) {
+		return bR;
+	} else if ((bearing <= -20) && (bearing >= -135)) {
+		return bL;
+	} else {
+		return bErr;
+	}
+}
+
 /**
  *  Buzz the buzzer for given relative direction.
  */
@@ -72,40 +97,38 @@ void buzzForDir(float bearing) {
 	while (bearing >= 180) bearing -= 360;
 	while (bearing < -180) bearing += 360;
 	// Serial.println(bearing);
-	if (bearing < 20 && bearing > -20) {
-		digitalWrite(bF, HIGH);
-	} else if ((bearing > 135) || (bearing < -135)) {
-		digitalWrite(bB, HIGH);
-	} else if ((bearing >= 20) && (bearing <= 135)) {
-		digitalWrite(bR, HIGH);
-	} else if ((bearing <= -20) && (bearing >= -135)) {
-		digitalWrite(bL, HIGH);
-	} else {
-		Serial.println("HEY LOOK AT ME");
-		digitalWrite(bF, HIGH);
-	}
+        digitalWrite(pinForDir(bearing), HIGH);
 }
 
 /**
- * Select buzzer for given absolute heading.
+ * Select buzzer for given absolute heading. 'dir' is the absolute heading in degrees
  */
-void buzz(int dir) {
+void buzz(float dir) {
 	float myBearing = getBearing();
-	float desired = bearings[dir];
-	
+	float desired = dir;
+
 	buzzForDir(desired - myBearing);
+        // p("%d %d %d %d\n", (int) desired, (int) myBearing, (int) (desired-myBearing), pinForDir(desired-myBearing));
 }
 
 int detectTone(char input[]) {
 	int maxval = Threshold;
 	int maxindex = -1;
-	for (int i = 8; i < 64; i++) {
+	for (int i = 9; i < 64; i++) {
 		if (input[i] > maxval) {
 			maxindex = i;
 			maxval = input[i];
 		}
 	}
+        if (maxindex == 8 || maxindex == 9) {
+          maxindex = 10;
+        }   
 	return maxindex;
+}
+
+/* Get heading from bin number  */
+float getHeadingFromBin(int binNum) {
+   return ((float) binNum * 7.6556 - 0.6551) - 75.0;
 }
 
 void setup() {
@@ -116,6 +139,7 @@ void setup() {
   pinMode(bL, OUTPUT);
     HMC6352SlaveAddress = HMC6352SlaveAddress >> 1; // I know 0x42 is less than 127, but this is still required
   Wire.begin();
+  prevbin = -1;
 }
 
 void loop(){
@@ -123,7 +147,7 @@ void loop(){
   static long tt;
   int val;
 
-  int status;
+  int bin;
    
    if (millis() > tt){
       if (i < 128){
@@ -141,37 +165,48 @@ void loop(){
            data[i] = sqrt(data[i] * data[i] + im[i] * im[i]); 
         }
         
-        status = detectTone(data);
+        bin = detectTone(data);
         
-        Serial.println(status);
-        
-        if (status < 0) {
+//        Serial.println(bin);
+        Serial.println(getBearing());
+        if (bin < 0) {
+          if (prevbin < 0) {
             digitalWrite(bF, LOW);
             digitalWrite(bR, LOW);
             digitalWrite(bB, LOW);
             digitalWrite(bL, LOW);
+          } else if (prevbin > 57) {
+            // send the stop signal
+            digitalWrite(bF, HIGH);
+            digitalWrite(bR, HIGH);
+  	    digitalWrite(bB, HIGH);
+  	    digitalWrite(bL, HIGH);
+          } else {
+            buzz(getHeadingFromBin(prevbin));
+          }
+        } else if (bin > 57) {
+          // send the stop signal
+          digitalWrite(bF, HIGH);
+          digitalWrite(bR, HIGH);
+	  digitalWrite(bB, HIGH);
+	  digitalWrite(bL, HIGH);
         } else {
-                        int lengthCutoffs = 8;
-			int index = lengthCutoffs-1;
-			for (index = lengthCutoffs-1; index >= 0; index--) {
-				if (cutoffs[index] < status) break;
-			}
-			index++;
-			
-			if (index == STOP) {
-				digitalWrite(bF, HIGH);
-				digitalWrite(bR, HIGH);
-				digitalWrite(bB, HIGH);
-				digitalWrite(bL, HIGH);
-			} else {
-				buzz(dirs[index]);
-			}
-		}
+          // find the direction we map to
+          buzz(getHeadingFromBin(bin));
+        }
+        
+        prevbin = bin;
       }
-    
     tt = millis();
    }
 }
+
+/*
+
+467 stop
+
+*/
+
 
 //midpoints
 
