@@ -19,7 +19,7 @@ char im[128];
 char data[128];
 char temp[4];
 
-  int prevbin;
+int prevbin;
 
 int bF = 2;
 int bR = 3;
@@ -31,18 +31,6 @@ int HMC6352SlaveAddress = 0x42;
 int slaveAddress;
 byte headingData[2];
 int headingValue;
-
-/*
-83
-127
-163
-193
-241
-293
-353
-397
-449 stop
-*/
 
 /**
  * Get bearing from the electronic compass.
@@ -69,6 +57,41 @@ float getBearing() {
   headingValue = headingData[0]*256 + headingData[1];  // Put the MSB and LSB together
   
   return (float) headingValue/10.0;
+}
+
+/* Calibration Function */
+void calibration() {
+    delay(2000);
+    //Serial.println("Get Ready in 2");
+    delay(2000);
+    //Serial.println("start");
+    digitalWrite(bL, HIGH);
+    digitalWrite(bR, HIGH);
+    delay(1000);
+    digitalWrite(bL, LOW);
+    digitalWrite(bR, LOW);
+    Wire.beginTransmission(slaveAddress);
+    Wire.write("C");   
+    Wire.endTransmission();
+    delay(10);
+    //Serial.println("rotate twice in 20 seconds NOW");
+    delay(20000);
+    //Serial.println("stop rotate");
+    delay(10);
+    Wire.beginTransmission(slaveAddress);
+    Wire.write("E");   
+    Wire.endTransmission();
+    delay(10);
+    Wire.beginTransmission(slaveAddress);
+    Wire.write("L");   
+    Wire.endTransmission();
+    digitalWrite(bL, HIGH);
+    digitalWrite(bR, HIGH);
+    delay(1000);
+    digitalWrite(bL, LOW);
+    digitalWrite(bR, LOW);
+    //Serial.print("end. Finished, Restart in 5 secs");// This gives you a chance to stop the loop returning 
+    delay(5000); //and starting again before you disconnect or upload new sketch
 }
 
 int pinForDir (float bearing) {
@@ -111,7 +134,7 @@ void buzz(float dir) {
 	float desired = dir;
 
 	buzzForDir(desired - myBearing);
-        // p("%d %d %d %d\n", (int) desired, (int) myBearing, (int) (desired-myBearing), pinForDir(desired-myBearing));
+        p("%d %d %d %d\n", (int) desired, (int) myBearing, (int) (desired-myBearing), pinForDir(desired-myBearing));
 }
 
 int detectTone(char input[]) {
@@ -143,32 +166,6 @@ void setup() {
   slaveAddress = HMC6352SlaveAddress >> 1; // I know 0x42 is less than 127, but this is still required
   Wire.begin();
   prevbin = -1;
-  
-  /* Calibration Mode */
-  
-  delay(5000);
-  Serial.println("Get Ready in 5");
-  delay(5000);
-  Serial.println("start");
-  delay(1000);
-  Wire.beginTransmission(slaveAddress);
-  Wire.write("C");   
-  Wire.endTransmission();
-  delay(10);
-  Serial.println("rotate twice in 20 seconds NOW");
-  delay(20000);
-  Serial.println("stop rotate");
-  delay(10);
-  Wire.beginTransmission(slaveAddress);
-  Wire.write("E");   
-  Wire.endTransmission();
-  delay(10);
-  Wire.beginTransmission(slaveAddress);
-  Wire.write("L");   
-  Wire.endTransmission();
-  Serial.print("end. Finished, Restart in 10 secs");// This gives you a chance to stop the loop returning 
-  delay(10000); //and starting again before you disconnect or upload new sketch
-  
 }
 
 void loop(){
@@ -196,7 +193,7 @@ void loop(){
         
         bin = detectTone(data);
         
-//        Serial.println(bin);
+       Serial.println(bin);
 //        Serial.println(getBearing());
         if (bin < 0) {
           if (prevbin < 0) {
@@ -219,7 +216,10 @@ void loop(){
           digitalWrite(bR, HIGH);
 	  digitalWrite(bB, HIGH);
 	  digitalWrite(bL, HIGH);
-        } else {
+        } else if (bin > 62) {
+          calibration(); 
+        }
+        else {
           // find the direction we map to
           buzz(getHeadingFromBin(bin));
         }
@@ -231,23 +231,7 @@ void loop(){
 }
 
 /*
-
-467 stop
-
+467 - stop 
+483 - calibration mode (bin 63)
 */
 
-
-//midpoints
-
-
-/*
-N 11
-NE 17
-E 21
-SE 26
-S 33
-SW 40
-W 48/7
-NW 52-53
-stop 63
-*/
