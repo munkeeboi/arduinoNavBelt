@@ -28,8 +28,9 @@ int bL = 5;
 int bErr = 6;
 
 int HMC6352SlaveAddress = 0x42;
-int HMC6352ReadAddress = 0x41; //"A" in hex, A command is: 
-
+int slaveAddress;
+byte headingData[2];
+int headingValue;
 
 /*
 83
@@ -47,25 +48,27 @@ int HMC6352ReadAddress = 0x41; //"A" in hex, A command is:
  * Get bearing from the electronic compass.
  */
 float getBearing() {
+  int i;
   //"Get Data. Compensate and Calculate New Heading"
-  Wire.beginTransmission(HMC6352SlaveAddress);
-  Wire.write(HMC6352ReadAddress);              // The "Get Data" command
+  Wire.beginTransmission(slaveAddress);
+  Wire.write("A");              // The "Get Data" command
   Wire.endTransmission();
 
   //time delays required by HMC6352 upon receipt of the command
   //Get Data. Compensate and Calculate New Heading : 6ms
-  delay(6);
+  delay(10);
 
-  Wire.requestFrom(HMC6352SlaveAddress, 2); //get the two data bytes, MSB and LSB
-
-  //"The heading output data will be the value in tenths of degrees
-  //from zero to 3599 and provided in binary format over the two bytes."
-  byte MSB = Wire.read();
-  byte LSB = Wire.read();
-
-  float headingSum = (MSB << 8) + LSB; //(MSB / LSB sum)
-  float headingInt = headingSum / 10;
-  return headingInt;
+  Wire.requestFrom(slaveAddress, 2); //get the two data bytes, MSB and LSB
+  i = 0;
+  
+  while(Wire.available() && i < 2)
+  { 
+    headingData[i] = Wire.read();
+    i++;
+  }
+  headingValue = headingData[0]*256 + headingData[1];  // Put the MSB and LSB together
+  
+  return (float) headingValue/10.0;
 }
 
 int pinForDir (float bearing) {
@@ -137,9 +140,35 @@ void setup() {
   pinMode(bR, OUTPUT);
   pinMode(bB, OUTPUT);
   pinMode(bL, OUTPUT);
-    HMC6352SlaveAddress = HMC6352SlaveAddress >> 1; // I know 0x42 is less than 127, but this is still required
+  slaveAddress = HMC6352SlaveAddress >> 1; // I know 0x42 is less than 127, but this is still required
   Wire.begin();
   prevbin = -1;
+  
+  /* Calibration Mode */
+  
+  delay(5000);
+  Serial.println("Get Ready in 5");
+  delay(5000);
+  Serial.println("start");
+  delay(1000);
+  Wire.beginTransmission(slaveAddress);
+  Wire.write("C");   
+  Wire.endTransmission();
+  delay(10);
+  Serial.println("rotate twice in 20 seconds NOW");
+  delay(20000);
+  Serial.println("stop rotate");
+  delay(10);
+  Wire.beginTransmission(slaveAddress);
+  Wire.write("E");   
+  Wire.endTransmission();
+  delay(10);
+  Wire.beginTransmission(slaveAddress);
+  Wire.write("L");   
+  Wire.endTransmission();
+  Serial.print("end. Finished, Restart in 10 secs");// This gives you a chance to stop the loop returning 
+  delay(10000); //and starting again before you disconnect or upload new sketch
+  
 }
 
 void loop(){
@@ -168,7 +197,7 @@ void loop(){
         bin = detectTone(data);
         
 //        Serial.println(bin);
-        Serial.println(getBearing());
+//        Serial.println(getBearing());
         if (bin < 0) {
           if (prevbin < 0) {
             digitalWrite(bF, LOW);
