@@ -210,21 +210,21 @@ void loop(){
           } else {
             buzz(getHeadingFromBin(prevbin));
           }
+        } else if (bin > 62) {
+          calibration(); 
         } else if (bin > 57) {
           // send the stop signal
           digitalWrite(bF, HIGH);
           digitalWrite(bR, HIGH);
 	  digitalWrite(bB, HIGH);
 	  digitalWrite(bL, HIGH);
-        } else if (bin > 62) {
-          calibration(); 
         }
         else {
           // find the direction we map to
           buzz(getHeadingFromBin(bin));
         }
         
-        prevbin = bin;
+        if (bin <= 62) prevbin = bin;
       }
     tt = millis();
    }
